@@ -49,10 +49,15 @@ def word_buffer(input_word):
         character = FONT[char]
         for x in range(letter_rows):
             for y in range(letter_columns):
-                # imagine buffer as x,y grid it is a nested list
-                # first you take the row list, then fill the required column
-                # with the symbol for the character at that location
-                buffer[x][column + y] = character[x * letter_columns + y]
+                """
+                imagine buffer as x,y grid, it is a nested list
+                first you take the row list, then fill the required column
+                with either the inputted character or a space
+                """
+                char_or_space = character[x * letter_columns + y] 
+                if char_or_space == "#":
+                    char_or_space = char
+                buffer[x][column + y] = char_or_space
     return buffer
 
 

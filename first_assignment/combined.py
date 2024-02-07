@@ -53,10 +53,15 @@ def word_buffer(input_word):
         character = FONT[char]
         for x in range(letter_rows):
             for y in range(letter_columns):
-                # imagine buffer as x,y grid it is a nested list
-                # first you take the row list, then fill the required column
-                # with the symbol for the character at that location
-                buffer[x][column + y] = character[x * letter_columns + y]
+                """
+                imagine buffer as x,y grid, it is a nested list
+                first you take the row list, then fill the required column
+                with either the inputted character or a space
+                """
+                char_or_space = character[x * letter_columns + y] 
+                if char_or_space == "#":
+                    char_or_space = char
+                buffer[x][column + y] = char_or_space
     return buffer
 
 def age_calc(future_date, birth_date):
@@ -90,9 +95,7 @@ def temp_calc(input_number, starting_unit, return_unit):
     """
     kelvin = None
     if starting_unit == "C":
-        print(input_number)
         kelvin = input_number + 273.15
-        print(kelvin)
     elif starting_unit == "F":
         kelvin = input_number * (5 / 9) + 459.67
     elif starting_unit == "R":
@@ -107,7 +110,6 @@ def temp_calc(input_number, starting_unit, return_unit):
     elif return_unit == "R":
         output = kelvin / (5 / 9)
     else:
-        print(f"output = {kelvin}")
         output = kelvin
     return output
 
