@@ -1,10 +1,16 @@
 import os
 import random
 
-def card_finder(image_dir):
-    cards = {}  
-    card_names = os.listdir(image_dir)
+class State:
+    cards = {}
+    deck = {}
+    player_hand = {}
+    player_value = 0
+    house_hand = {}
+    house_value = 0
 
+def card_finder(image_dir):
+    card_names = os.listdir(image_dir)
     for card in card_names:
 
         if card == "card_back.png":
@@ -19,17 +25,32 @@ def card_finder(image_dir):
             card_value = 11
         else:
             card_value = 10
-        cards[card] = card_value
+        State.cards[card] = card_value
 
-    return cards
+def draw_card(player):
+    card = random.choice(list(State.cards.keys())) 
+    card_value = State.cards[card]
+    if player == True:
+        State.player_hand[card] = card_value
+        State.player_value += int(card_value)
+    else:
+        State.house_hand[card] = card_value
+        State.house_value += int(card_value)
+    del State.cards[card]
 
+def game_start():
+    draw_card(True)
+    draw_card(True)
+    draw_card(False)
+    draw_card(False)
+    return
 
 def main():
     script_dir = os.path.dirname(__file__)
     image_dir = os.path.join(script_dir, "best_cards")
+    card_finder(image_dir)
+    game_start()
+    print(f"player hand is {State.player_hand}, and a total value of {State.player_value}")
 
-    cards = card_finder(image_dir)
-    card, card_value = random.choice(list(cards.items())) 
-    print(card, card_value)
 if __name__ == "__main__":
     main()
