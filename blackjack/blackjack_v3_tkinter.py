@@ -5,40 +5,46 @@ import tkinter as tk
 import tkinter.font as font
 from PIL import ImageTk, Image
 
+
 @dataclasses.dataclass
 class Player:
     """
     Class created to streamline all the data
     that needs to be stored relating to the player and dealer.
     """
+
     hand: list = dataclasses.field(default_factory=list)
-    hand_value: int = 0 # total hand value
-    status: str = None # busted, blackjack, or stood
-    is_player: bool = True # is used to find the winner
+    hand_value: int = 0  # total hand value
+    status: str = None  # busted, blackjack, or stood
+    is_player: bool = True  # is used to find the winner
 
 
 @dataclasses.dataclass
 class State:
     """
-    Main class to hold all variables that could be needed globally. 
+    Main class to hold all variables that could be needed globally.
     It's reset everytime a new game is started.
     """
+
     deck: list = dataclasses.field(default_factory=list)
     game_end: bool = False
     player: Player = dataclasses.field(default_factory=Player)
     dealer: Player = dataclasses.field(default_factory=lambda: Player(is_player=False))
-    
+
+
 class GUI:
     window = None
     state_label = None
     player_image_labels = {}
     dealer_image_labels = {}
     card_images = {}
+    full_deck = []
 
 def load_image(name):
     image_dir = os.path.join(IMAGE_PATH, name)
-    print(image_dir)
+    #print(image_dir)
     return ImageTk.PhotoImage(file=image_dir)
+
 
 def label_maker(frame):
     return tk.Label(
@@ -161,14 +167,15 @@ def display_hand(state, player):
     cards = ""
     for i, card in enumerate(hand):
         cards += f"{card} "
-        GUI.card_images[card] = image = load_image(card)
+        if card not in GUI.card_images.keys():
+            GUI.card_images[card] = load_image(card)
         if player:
             label = GUI.player_image_labels[i]
         else:
             label = GUI.dealer_image_labels[i]
         label.grid(row=0, column=i)
-        update_label(label, image=image)
-        print(f"player = {player}, label = {label}, image = {image}")
+        update_label(label, image=GUI.card_images[card])
+        #print(f"player = {player}, label = {label}, image = {GUI.card_images[card]}")
 
     if hand == state.player.hand:
         print(f"Your hand ({state.player.value}): ")
@@ -187,6 +194,9 @@ def update_value(state, player):
     else:
         state.dealer.value = calculate_score(state, player)
 
+def clear_hide_label(label):
+    update_label(label, image=None)
+    label.grid_remove()
 
 def game_setup(state, full_deck):
     """
@@ -194,11 +204,7 @@ def game_setup(state, full_deck):
     shuffles it and deals the first cards to the player
     and dealer.
     """
-    state.deck = deck = list(full_deck)
-    random.shuffle(deck)
-    state.player.hand = [deck.pop(), deck.pop()]
-    state.dealer.hand = [deck.pop(), "card_back.png"]
-    print("-" * 25)
+    return
 
 
 def restart_game(state):
@@ -207,12 +213,7 @@ def restart_game(state):
     want to continue playing if not, it stops
     the program.
     """
-    restart = input("Do you want to stop playing (y)? If empty continue. ")
-    if restart == "y":
-        print("Thanks for playing.")
-        raise SystemExit
-    else:
-        pass
+    return
 
 
 def win_check(state, player):
@@ -261,8 +262,9 @@ def status_check(state, player):
 
     if winner == None:
         return
-    
+
     state.game_end = True
+    print(f"state.game_end = {state.game_end}")
     if "card_back.png" in state.dealer.hand:
         del state.dealer.hand[-1]
         deal_card(state, player=False)
@@ -276,8 +278,8 @@ def status_check(state, player):
             f"{winner} wins, player had {state.player.value} to the dealer's {state.dealer.value}"
         )
 
-
     restart_game(state)
+
 
 def dealer_turn(state):
     """
@@ -297,38 +299,46 @@ def dealer_turn(state):
     state.dealer.status = "stood"
     status_check(state, player=False)
 
+
+def player_stand(state):
+    state.player.status = "stood"
+    dealer_turn(state)
+
 def btn_op(state, text):
     """Updates the label for normal keyboard,
     or does specific function for special buttons."""
+    if text == "Reset":
+        game(state, GUI.full_deck)
     if not state.game_end:
         if text == "Hit":
             deal_card(state, player=True)
             status_check(state, player=True)
 
         elif text == "Stand":
-            state.player.status = "stood"
-            #GUI.window.unbind("Hit")
-            #GUI.window.unbind("Stand")
+            player_stand(state)
 
-        elif text == "Reset":
-            state = State()
-            
 
 def game(state, full_deck):
-    print("Welcome to Blackjack!") # create a new instance to reset all variables
-    game_setup(state, full_deck)
+    # create a new instance to reset all variables
+    for i in range(len(GUI.player_image_labels)):
+        clear_hide_label(GUI.player_image_labels[i])
+        clear_hide_label(GUI.dealer_image_labels[i])
+
+    state.deck = deck = list(full_deck)
+    random.shuffle(deck)
+    state.player.hand = [deck.pop(), deck.pop()]
+    state.dealer.hand = [deck.pop(), "card_back.png"]
+    print("-" * 25)
     display_hand(state, player=False)
     display_hand(state, player=True)
     status_check(state, player=False)
     status_check(state, player=True)
-    #dealer_turn(state)
-    #if state.game_end:
-    #    continue
+
 
 def main():
     global IMAGE_PATH
     global FONT
-    
+
     GUI.window = window = tk.Tk()
     GUI.window.title("Blackjack")
     GUI.window.resizable(False, False)
@@ -336,7 +346,7 @@ def main():
     script_dir = os.path.dirname(__file__)
     IMAGE_PATH = os.path.join(script_dir, "best_cards")
     FONT = font.Font(family="Courier", size=30, weight="bold")
-    full_deck = create_deck(IMAGE_PATH)
+    GUI.full_deck = create_deck(IMAGE_PATH)
 
     state = State()
 
@@ -353,17 +363,17 @@ def main():
     hit_button.grid(row=0, column=0)
     stand_button = btn_maker(state, button_frame, "Stand")
     stand_button.grid(row=0, column=1)
+    restart_button = btn_maker(state, button_frame, "Reset")
+    restart_button.grid(row=0, column=2)
 
     for i in range(11):
-        GUI.player_image_labels[i] = (label_maker(player_frame))
-        GUI.dealer_image_labels[i] = (label_maker(dealer_frame))
-        print(f"creating label #{i}")
-    print(f"player labels: {GUI.player_image_labels}")
+        GUI.player_image_labels[i] = label_maker(player_frame)
+        GUI.dealer_image_labels[i] = label_maker(dealer_frame)
 
-    game(state, full_deck)
+    game(state, GUI.full_deck)
 
     window.mainloop()
 
+
 if __name__ == "__main__":
     main()
-
