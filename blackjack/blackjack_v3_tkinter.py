@@ -5,6 +5,8 @@ import tkinter as tk
 import tkinter.font as font
 from PIL import ImageTk, Image
 
+# flake8:noqa
+
 
 @dataclasses.dataclass
 class Player:
@@ -32,24 +34,31 @@ class State:
     dealer: Player = dataclasses.field(default_factory=lambda: Player(is_player=False))
 
 
-class GUI:
-    window = None
-    state_label = None
-    player_image_labels = {}
-    dealer_image_labels = {}
-    card_images = {}
-    full_deck = []
+class App:
+    def __init__(self):
+        self.state = State()
+        self.game_state_label = None
+        self.player_value_label = None
+        self.dealer_value_label = None
+        self.player_image_labels = {}
+        self.dealer_image_labels = {}
+        self.card_images = {}
+        self.card_cropped = {}
+        self.full_deck = []
+        self.player_wins = 0
+        self.dealer_wins = 0
+
 
 def load_image(name):
     image_dir = os.path.join(IMAGE_PATH, name)
-    #print(image_dir)
-    return ImageTk.PhotoImage(file=image_dir)
+    image = Image.open(image_dir).convert("RGBA")
+    return image
 
 
-def label_maker(frame):
+def label_maker(frame=None, text=" "):
     return tk.Label(
         frame,
-        text=" ",
+        text=text,
         font=FONT,
         borderwidth=3,
         padx=20,
@@ -58,8 +67,8 @@ def label_maker(frame):
     )
 
 
-def btn_maker(state, frame, text):
-    return tk.Button(frame, text=text, font=FONT, command=lambda: btn_op(state, text))
+def btn_maker(app, frame, text):
+    return tk.Button(frame, text=text, font=FONT, command=lambda: btn_op(app, text))
 
 
 def update_label(label, text=None, color=None, image=None):
@@ -76,55 +85,51 @@ def create_deck(image_dir):
     return full_deck
 
 
-def get_hand(state, player):
+def get_hand(app, player):
     """
-    Takes in the state dataclass and the boolean
+    Takes in the app.state dataclass and the boolean
     of if it's for the player, then returns the
     hand for either dealer or player.
     """
     if player:
-        hand = state.player.hand
+        hand = app.state.player.hand
     else:
-        hand = state.dealer.hand
+        hand = app.state.dealer.hand
     return hand
 
 
-def get_status(state, player):
+def get_status(app, player):
     """
-    Takes in the state dataclass and the boolean of
+    Takes in the app.state dataclass and the boolean of
     if it's for the player, then returns the statys
     for either dealer or player.
     """
     if player:
-        status = state.player.status
+        status = app.state.player.status
     else:
-        status = state.dealer.status
+        status = app.state.dealer.status
     return status
 
 
-def deal_card(state, player):
+def deal_card(app, player):
     """
     Uses pop to draw a card from the deck into the
     inputted player's hand.
     """
-    hand = get_hand(state, player)
-    card = state.deck.pop()
-    if player:
-        print(f"player drew {card}")
-    else:
-        print(f"dealer drew {card}")
+    hand = get_hand(app, player)
+    card = app.state.deck.pop()
     hand.append(card)
-    display_hand(state, player)
+    display_hand(app, player)
 
 
-def calculate_score(state, player):
+def calculate_score(app, player):
     """
     Returns the total value of the dealer or player's hand.
     Also checks to see if players have busted or gotten a blackjack.
     """
     hand_value = 0
     aces = 0
-    hand = get_hand(state, player)
+    hand = get_hand(app, player)
     for card in hand:
         if card == "card_back.png":
             continue
@@ -132,99 +137,107 @@ def calculate_score(state, player):
 
         numeric = number.isnumeric()
 
-        if numeric == True:
-            value = int(number)
-        elif number == "ace":
+        if number == "ace":
             value = 11
             aces += 1
+        elif numeric:
+            value = int(number)
         else:
             value = 10
         hand_value += value
 
     if hand_value == 21:
         if player:
-            state.player.status = "blackjack"
+            app.state.player.status = "blackjack"
         else:
-            state.dealer.status = "blackjack"
+            app.state.dealer.status = "blackjack"
     while aces > 0 and hand_value > 21:
         aces -= 1
         hand_value -= 10
     if hand_value > 21:
         if player:
-            state.player.status = "busted"
+            app.state.player.status = "busted"
         else:
-            state.dealer.status = "busted"
+            app.state.dealer.status = "busted"
     return hand_value
 
 
-def display_hand(state, player):
+def display_hand(app, player):
     """
     Get all the cards in inputted player's hand and then
     combine the strings and print.
     """
-    update_value(state, player)
-    hand = get_hand(state, player)
+    update_value(app, player)
+    hand = get_hand(app, player)
     cards = ""
+    card_stack = False
+
+    if len(hand) >= 4:
+        card_stack = True
+
     for i, card in enumerate(hand):
         cards += f"{card} "
-        if card not in GUI.card_images.keys():
-            GUI.card_images[card] = load_image(card)
+
+        if card not in app.card_images.keys():
+            img = load_image(card)
+
+            app.card_images[card] = ImageTk.PhotoImage(img)
+
+            width, height = img.size
+
+            img2 = img.crop([ 0, 0, width/4, height])
+            app.card_cropped[card] = ImageTk.PhotoImage(img2)
+
         if player:
-            label = GUI.player_image_labels[i]
+            label = app.player_image_labels[i]
         else:
-            label = GUI.dealer_image_labels[i]
+            label = app.dealer_image_labels[i]
+
+        if card_stack and i != len(hand) - 1:
+            image = app.card_cropped[card]
+        else:
+            image = app.card_images[card]
+
         label.grid(row=0, column=i)
-        update_label(label, image=GUI.card_images[card])
-        #print(f"player = {player}, label = {label}, image = {GUI.card_images[card]}")
+        update_label(label, image=image)
 
-    if hand == state.player.hand:
-        print(f"Your hand ({state.player.value}): ")
+    if hand == app.state.player.hand:
+        label = app.player_value_label
+        value = app.state.player.hand_value
     else:
-        print(f"Dealer's hand ({state.dealer.value}): ")
-    print(cards)
+        label = app.dealer_value_label
+        value = app.state.dealer.hand_value
+    update_label(label, text=value)
 
 
-def update_value(state, player):
+def update_value(app, player):
     """
     Calculates the total hand value for either inputted player.
     Also calculates if player got a blackjack or busted.
     """
     if player:
-        state.player.value = calculate_score(state, player)
+        app.state.player.hand_value = calculate_score(app, player)
     else:
-        state.dealer.value = calculate_score(state, player)
+        app.state.dealer.hand_value = calculate_score(app, player)
+
 
 def clear_hide_label(label):
     update_label(label, image=None)
     label.grid_remove()
 
-def game_setup(state, full_deck):
-    """
-    Runs before every game, it creates a new deck,
-    shuffles it and deals the first cards to the player
-    and dealer.
-    """
-    return
 
-
-def restart_game(state):
-    """
-    Takes input from the player if they
-    want to continue playing if not, it stops
-    the program.
-    """
-    return
-
-
-def win_check(state, player):
+def win_check(app, player):
     """
     Takes an input player and returns what the game outcome is,
     player won, dealer won, or tie.
     """
     winner = None
-    status = get_status(state, player)
+    status = get_status(app, player)
 
-    if state.player.is_player == player:
+    player_value = app.state.player.hand_value
+    dealer_value = app.state.dealer.hand_value
+
+    if app.state.player.is_player == player:
         user = "player"
         opponent = "dealer"
     else:
@@ -232,7 +245,7 @@ def win_check(state, player):
         opponent = "player"
 
     if status == "blackjack":
-        if state.player.value == state.dealer.value:
+        if player_value == dealer_value:
             winner = "tie"
         else:
             winner = user
@@ -240,137 +253,152 @@ def win_check(state, player):
     if status == "busted":
         winner = opponent
 
-    if state.player.status and state.dealer.status == "stood":
-        if state.player.value > state.dealer.value:
+    if app.state.player.status and app.state.dealer.status == "stood":
+        if player_value > dealer_value:
             winner = "player"
-        elif state.player.value < state.dealer.value:
+        elif player_value < dealer_value:
             winner = "dealer"
         else:
             winner = "tie"
 
+    if winner == "player":
+        app.player_wins += 1
+    elif winner == "dealer":
+        app.dealer_wins += 1
     return winner
 
 
-def status_check(state, player):
+def status_check(app, player):
     """
     Ends the game if end conditions are met,
     and prints both player's total hand value
     and the final winner.
     """
-    update_value(state, player)
-    winner = win_check(state, player)
+    update_value(app, player)
+    winner = win_check(app, player)
+    if winner:
+        app.state.game_end = True
 
-    if winner == None:
-        return
+        if "card_back.png" in app.state.dealer.hand:
+            del app.state.dealer.hand[-1]
+            deal_card(app, player=False)
 
-    state.game_end = True
-    print(f"state.game_end = {state.game_end}")
-    if "card_back.png" in state.dealer.hand:
-        del state.dealer.hand[-1]
-        deal_card(state, player=False)
-
-    if winner == "tie":
-        print(
-            f"The game has ended in a tie, {state.player.value} to {state.dealer.value}"
-        )
-    else:
-        print(
-            f"{winner} wins, player had {state.player.value} to the dealer's {state.dealer.value}"
-        )
-
-    restart_game(state)
+        if winner == "tie":
+            string = f"Tie, P:{app.state.player.hand_value} to D:{app.state.dealer.hand_value}"
+        else:
+            winner = winner.capitalize()
+            string = f"{winner} wins, P:{app.state.player.hand_value} to D:{app.state.dealer.hand_value}"
+        update_label(app.game_state_label, text=string)
 
 
-def dealer_turn(state):
+def dealer_turn(app):
     """
     After the player stands or gets blackjack
     the dealer plays. Reveals what the hidden card
     is before hitting until reaching a total hand
     value above or equal to 17.
     """
-    del state.dealer.hand[-1]
-    deal_card(state, player=False)
+    del app.state.dealer.hand[-1]
+    deal_card(app, player=False)
 
-    while state.dealer.value < 17:
-        deal_card(state, player=False)
-        status_check(state, player=False)
-        if state.game_end:
+    while app.state.dealer.hand_value < 17:
+        deal_card(app, player=False)
+        status_check(app, player=False)
+        if app.state.game_end:
             return
-    state.dealer.status = "stood"
-    status_check(state, player=False)
+    app.state.dealer.status = "stood"
+    status_check(app, player=False)
 
 
-def player_stand(state):
-    state.player.status = "stood"
-    dealer_turn(state)
+def player_stand(app):
+    app.state.player.status = "stood"
+    dealer_turn(app)
 
-def btn_op(state, text):
+
+def btn_op(app, text):
     """Updates the label for normal keyboard,
     or does specific function for special buttons."""
     if text == "Reset":
-        game(state, GUI.full_deck)
-    if not state.game_end:
+        game(app)
+        update_label(
+            app.game_state_label,
+            f"Player wins: {app.player_wins} to Dealer wins: {app.dealer_wins}",
+        )
+    if not app.state.game_end:
         if text == "Hit":
-            deal_card(state, player=True)
-            status_check(state, player=True)
+            deal_card(app, player=True)
+            status_check(app, player=True)
 
         elif text == "Stand":
-            player_stand(state)
+            player_stand(app)
 
 
-def game(state, full_deck):
+def game(app):
     # create a new instance to reset all variables
-    for i in range(len(GUI.player_image_labels)):
-        clear_hide_label(GUI.player_image_labels[i])
-        clear_hide_label(GUI.dealer_image_labels[i])
+    for i in range(len(app.player_image_labels)):
+        clear_hide_label(app.player_image_labels[i])
+        clear_hide_label(app.dealer_image_labels[i])
 
-    state.deck = deck = list(full_deck)
+    app.state = State()
+    app.state.deck = deck = list(app.full_deck)
+
     random.shuffle(deck)
-    state.player.hand = [deck.pop(), deck.pop()]
-    state.dealer.hand = [deck.pop(), "card_back.png"]
-    print("-" * 25)
-    display_hand(state, player=False)
-    display_hand(state, player=True)
-    status_check(state, player=False)
-    status_check(state, player=True)
+
+    app.state.player.hand = [deck.pop(), deck.pop()]
+    app.state.dealer.hand = [deck.pop(), "card_back.png"]
+
+    display_hand(app, player=False)
+    display_hand(app, player=True)
+    status_check(app, player=False)
+    status_check(app, player=True)
 
 
 def main():
     global IMAGE_PATH
     global FONT
 
-    GUI.window = window = tk.Tk()
-    GUI.window.title("Blackjack")
-    GUI.window.resizable(False, False)
+    app = App()
+
+    window = tk.Tk()
+    window.title("Blackjack")
+    window.configure(bg="green")
+    window.geometry("900x700")
 
     script_dir = os.path.dirname(__file__)
     IMAGE_PATH = os.path.join(script_dir, "best_cards")
     FONT = font.Font(family="Courier", size=30, weight="bold")
-    GUI.full_deck = create_deck(IMAGE_PATH)
+    app.full_deck = create_deck(IMAGE_PATH)
 
-    state = State()
+    app.game_state_label = label_maker(text="Welcome to Blackjack!")
+    app.game_state_label.pack(side=tk.TOP, fill="x")
 
-    dealer_frame = tk.Frame(window, width=300, height=30, bg="honeydew2")
-    dealer_frame.grid(row=1, column=0)
+    dealer_frame = tk.Frame(window, width=300, height=30, bg="Green")
+    dealer_frame.pack(side=tk.TOP)
 
-    player_frame = tk.Frame(window, width=300, height=30, bg="honeydew2")
-    player_frame.grid(row=2, column=0)
+    app.dealer_value_label = label_maker(text=app.state.dealer.hand_value)
+    app.dealer_value_label.pack(side=tk.TOP)
 
-    button_frame = tk.Frame(window, width=300, height=10, bg="honeydew2")
-    button_frame.grid(row=3, column=0)
+    player_frame = tk.Frame(window, width=300, height=30, bg="Green")
+    player_frame.pack(side=tk.TOP)
 
-    hit_button = btn_maker(state, button_frame, "Hit")
+    app.player_value_label = label_maker(text=app.state.player.hand_value)
+    app.player_value_label.pack(side=tk.TOP)
+
+    button_frame = tk.Frame(window, width=300, height=10, bg="Green")
+    button_frame.pack(side=tk.TOP)
+
+    hit_button = btn_maker(app, button_frame, "Hit")
     hit_button.grid(row=0, column=0)
-    stand_button = btn_maker(state, button_frame, "Stand")
+    stand_button = btn_maker(app, button_frame, "Stand")
     stand_button.grid(row=0, column=1)
-    restart_button = btn_maker(state, button_frame, "Reset")
+    restart_button = btn_maker(app, button_frame, "Reset")
     restart_button.grid(row=0, column=2)
 
     for i in range(11):
-        GUI.player_image_labels[i] = label_maker(player_frame)
-        GUI.dealer_image_labels[i] = label_maker(dealer_frame)
+        app.player_image_labels[i] = label_maker(player_frame)
+        app.dealer_image_labels[i] = label_maker(dealer_frame)
 
-    game(state, GUI.full_deck)
+    game(app)
 
     window.mainloop()
 
