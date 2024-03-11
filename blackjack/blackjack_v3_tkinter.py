@@ -48,7 +48,29 @@ class App:
         self.player_wins = 0
         self.dealer_wins = 0
         self.window_resized = False
+        self.window_state = None
 
+    def resize_event(self, event):
+        window_resized = False
+        if event.widget != self.window:
+            return
+
+        event_height = event.widget.winfo_height
+        event_width = event.widget.winfo_width
+
+        window_height = self.window.winfo_height
+        window_width = self.window.winfo_width
+
+        if self.window.state() != self.window_state: 
+            print("zoomed")
+            self.window_state = self.window.state()
+            window_resized = True
+
+        if event_height != window_height or event_width != window_width:
+            print("window_resized")
+            window_resized = True
+
+        self.window_resized = window_resized
 
 def load_image(app, name):
     image_dir = os.path.join(app.image_path, name)
@@ -161,16 +183,16 @@ def shrink_check(app, hand):
     if card_spaces < len(hand):
         card_stack = True
 
-    if window_width < 600:
-        update_label(app.game_state_label, font=app.small_font)
-        app.hit_button.configure(font=app.small_font)
-        app.stand_button.configure(font=app.small_font)
-        app.reset_button.configure(font=app.small_font)
-    else:
-        update_label(app.game_state_label, font=app.font)
-        app.hit_button.configure(font=app.font)
-        app.stand_button.configure(font=app.font)
-        app.reset_button.configure(font=app.font)
+    font_size = int(window_width / 30)
+    if font_size > 45:
+        font_size = 45
+
+    app.dynamic_font = Font.Font(family="Courier", size=font_size, weight="bold")
+    update_label(app.game_state_label, font=app.dynamic_font)
+    app.hit_button.configure(font=app.dynamic_font)
+    app.stand_button.configure(font=app.dynamic_font)
+    app.reset_button.configure(font=app.dynamic_font)
+
     return card_stack
 
 
@@ -229,6 +251,11 @@ def update_value(app, player):
         app.state.player.hand_value = calculate_score(app, player)
     else:
         app.state.dealer.hand_value = calculate_score(app, player)
+
+
+def clear_hide_label(label):
+    update_label(label, image=None)
+    label.grid_remove()
 
 
 def deal_card(app, player):
@@ -354,16 +381,12 @@ def btn_op(app, text):
             player_stand(app)
 
 
-def window_resized(event):
-    window_resized = True
-    return window_resized
-
-
 def resizer(app):
     if app.window_resized:
         display_hand(app, player=False)
         display_hand(app, player=True)
         app.window_resized == False
+
     app.window.after(200, resizer, app)
 
 
@@ -382,8 +405,8 @@ def game(app):
     app.state.player.hand = [deck.pop(), deck.pop()]
     app.state.dealer.hand = [deck.pop(), "card_back.png"]
 
-    status_check(app, player=False)
-    status_check(app, player=True)
+    display_hand(app, player=True)
+    display_hand(app, player=False)
 
 
 def main():
@@ -397,13 +420,13 @@ def main():
     script_dir = os.path.dirname(__file__)
     app.image_path = image_path = os.path.join(script_dir, "best_cards")
     app.font = font = Font.Font(family="Courier", size=30, weight="bold")
-    app.small_font = Font.Font(family="Courier", size=15, weight="bold")
+    app.dynamic_font = font
     app.full_deck = create_deck(image_path)
 
     app.game_state_label = label_maker(app, text="Welcome to Blackjack!")
     app.game_state_label.pack(side=tk.TOP, fill="x")
 
-    spacer1 = tk.Label(window, bg="Green")
+    spacer1 = tk.Frame(window, bg="Green")
     spacer1.pack(side=tk.TOP, expand=True, fill="y")
 
     dealer_frame = tk.Frame(window, width=300, height=30, bg="Green")
@@ -412,7 +435,7 @@ def main():
     app.dealer_value_label = label_maker(app, text=app.state.dealer.hand_value)
     app.dealer_value_label.pack(side=tk.TOP)
 
-    spacer2 = tk.Label(window, bg="Green")
+    spacer2 = tk.Frame(window, bg="Green")
     spacer2.pack(side=tk.TOP, expand=True, fill="y")
 
     player_frame = tk.Frame(window, width=300, height=30, bg="Green")
@@ -421,7 +444,7 @@ def main():
     app.player_value_label = label_maker(app, text=app.state.player.hand_value)
     app.player_value_label.pack(side=tk.TOP)
 
-    spacer3 = tk.Label(window, bg="Green")
+    spacer3 = tk.Frame(window, bg="Green")
     spacer3.pack(side=tk.TOP, expand=True, fill="y")
 
     button_frame = tk.Frame(window, width=300, height=10, bg="Green")
@@ -429,16 +452,21 @@ def main():
 
     app.hit_button = btn_maker(app, button_frame, "Hit")
     app.hit_button.grid(row=0, column=0)
+    app.hit_button.bind("f", lambda event: btn_op("Hit"))
+
     app.stand_button = btn_maker(app, button_frame, "Stand")
     app.stand_button.grid(row=0, column=1)
+    app.stand_button.bind("d", lambda event: btn_op("Stand"))
+
     app.reset_button = btn_maker(app, button_frame, "Reset")
     app.reset_button.grid(row=0, column=2)
+    app.stand_button.bind("r", lambda event: btn_op("Reset"))
 
     for i in range(11):
         app.player_image_labels[i] = label_maker(app, player_frame)
         app.dealer_image_labels[i] = label_maker(app, dealer_frame)
 
-    app.window_resized = app.game_state_label.bind("<Configure>", window_resized)
+    app.window_resized = app.window.bind("<Configure>", app.resize_event)
     window.after(20, resizer, app)
 
     game(app)
