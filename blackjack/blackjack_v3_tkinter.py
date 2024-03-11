@@ -2,10 +2,10 @@ import random
 import os
 import dataclasses
 import tkinter as tk
-import tkinter.font as font
+import tkinter.font as Font
 from PIL import ImageTk, Image
 
-# flake8:noqa
+# flake8: noqa
 
 
 @dataclasses.dataclass
@@ -47,19 +47,20 @@ class App:
         self.full_deck = []
         self.player_wins = 0
         self.dealer_wins = 0
+        self.window_resized = False
 
 
-def load_image(name):
-    image_dir = os.path.join(IMAGE_PATH, name)
+def load_image(app, name):
+    image_dir = os.path.join(app.image_path, name)
     image = Image.open(image_dir).convert("RGBA")
     return image
 
 
-def label_maker(frame=None, text=" "):
+def label_maker(app, frame=None, text=" "):
     return tk.Label(
         frame,
         text=text,
-        font=FONT,
+        font=app.font,
         borderwidth=3,
         padx=20,
         pady=10,
@@ -68,11 +69,11 @@ def label_maker(frame=None, text=" "):
 
 
 def btn_maker(app, frame, text):
-    return tk.Button(frame, text=text, font=FONT, command=lambda: btn_op(app, text))
+    return tk.Button(frame, text=text, font=app.font, command=lambda: btn_op(app, text))
 
 
-def update_label(label, text=None, color=None, image=None):
-    label.configure(text=text, bg=color, image=image)
+def update_label(label, text=None, color=None, image=None, font=None):
+    label.configure(text=text, bg=color, image=image, font=font)
 
 
 def create_deck(image_dir):
@@ -109,17 +110,6 @@ def get_status(app, player):
     else:
         status = app.state.dealer.status
     return status
-
-
-def deal_card(app, player):
-    """
-    Uses pop to draw a card from the deck into the
-    inputted player's hand.
-    """
-    hand = get_hand(app, player)
-    card = app.state.deck.pop()
-    hand.append(card)
-    display_hand(app, player)
 
 
 def calculate_score(app, player):
@@ -162,6 +152,28 @@ def calculate_score(app, player):
     return hand_value
 
 
+def shrink_check(app, hand):
+    window_width = app.window.winfo_width()
+    card_width = 125
+    card_spaces = (window_width - 40) / card_width
+    card_stack = False
+
+    if card_spaces < len(hand):
+        card_stack = True
+
+    if window_width < 600:
+        update_label(app.game_state_label, font=app.small_font)
+        app.hit_button.configure(font=app.small_font)
+        app.stand_button.configure(font=app.small_font)
+        app.reset_button.configure(font=app.small_font)
+    else:
+        update_label(app.game_state_label, font=app.font)
+        app.hit_button.configure(font=app.font)
+        app.stand_button.configure(font=app.font)
+        app.reset_button.configure(font=app.font)
+    return card_stack
+
+
 def display_hand(app, player):
     """
     Get all the cards in inputted player's hand and then
@@ -170,22 +182,20 @@ def display_hand(app, player):
     update_value(app, player)
     hand = get_hand(app, player)
     cards = ""
-    card_stack = False
 
-    if len(hand) >= 4:
-        card_stack = True
+    card_stack = shrink_check(app, hand)
 
     for i, card in enumerate(hand):
         cards += f"{card} "
 
         if card not in app.card_images.keys():
-            img = load_image(card)
+            img = load_image(app, card)
 
             app.card_images[card] = ImageTk.PhotoImage(img)
 
             width, height = img.size
 
-            img2 = img.crop([ 0, 0, width/4, height])
+            img2 = img.crop([0, 0, width / 4, height])
             app.card_cropped[card] = ImageTk.PhotoImage(img2)
 
         if player:
@@ -219,6 +229,17 @@ def update_value(app, player):
         app.state.player.hand_value = calculate_score(app, player)
     else:
         app.state.dealer.hand_value = calculate_score(app, player)
+
+
+def deal_card(app, player):
+    """
+    Uses pop to draw a card from the deck into the
+    inputted player's hand.
+    """
+    hand = get_hand(app, player)
+    card = app.state.deck.pop()
+    hand.append(card)
+    display_hand(app, player)
 
 
 def clear_hide_label(label):
@@ -322,7 +343,7 @@ def btn_op(app, text):
         game(app)
         update_label(
             app.game_state_label,
-            f"Player wins: {app.player_wins} to Dealer wins: {app.dealer_wins}",
+            f"Player to Dealer wins {app.player_wins}:{app.dealer_wins}",
         )
     if not app.state.game_end:
         if text == "Hit":
@@ -333,8 +354,22 @@ def btn_op(app, text):
             player_stand(app)
 
 
+def window_resized(event):
+    window_resized = True
+    return window_resized
+
+
+def resizer(app):
+    if app.window_resized:
+        display_hand(app, player=False)
+        display_hand(app, player=True)
+        app.window_resized == False
+    app.window.after(200, resizer, app)
+
+
 def game(app):
-    # create a new instance to reset all variables
+    app.window_resized == True
+
     for i in range(len(app.player_image_labels)):
         clear_hide_label(app.player_image_labels[i])
         clear_hide_label(app.dealer_image_labels[i])
@@ -347,56 +382,64 @@ def game(app):
     app.state.player.hand = [deck.pop(), deck.pop()]
     app.state.dealer.hand = [deck.pop(), "card_back.png"]
 
-    display_hand(app, player=False)
-    display_hand(app, player=True)
     status_check(app, player=False)
     status_check(app, player=True)
 
 
 def main():
-    global IMAGE_PATH
-    global FONT
-
     app = App()
 
-    window = tk.Tk()
+    app.window = window = tk.Tk()
     window.title("Blackjack")
     window.configure(bg="green")
-    window.geometry("900x700")
+    window.geometry("900x750")
 
     script_dir = os.path.dirname(__file__)
-    IMAGE_PATH = os.path.join(script_dir, "best_cards")
-    FONT = font.Font(family="Courier", size=30, weight="bold")
-    app.full_deck = create_deck(IMAGE_PATH)
+    app.image_path = image_path = os.path.join(script_dir, "best_cards")
+    app.font = font = Font.Font(family="Courier", size=30, weight="bold")
+    app.small_font = Font.Font(family="Courier", size=15, weight="bold")
+    app.full_deck = create_deck(image_path)
 
-    app.game_state_label = label_maker(text="Welcome to Blackjack!")
+    app.game_state_label = label_maker(app, text="Welcome to Blackjack!")
     app.game_state_label.pack(side=tk.TOP, fill="x")
+
+    spacer1 = tk.Label(window, bg="Green")
+    spacer1.pack(side=tk.TOP, expand=True, fill="y")
 
     dealer_frame = tk.Frame(window, width=300, height=30, bg="Green")
     dealer_frame.pack(side=tk.TOP)
 
-    app.dealer_value_label = label_maker(text=app.state.dealer.hand_value)
+    app.dealer_value_label = label_maker(app, text=app.state.dealer.hand_value)
     app.dealer_value_label.pack(side=tk.TOP)
+
+    spacer2 = tk.Label(window, bg="Green")
+    spacer2.pack(side=tk.TOP, expand=True, fill="y")
 
     player_frame = tk.Frame(window, width=300, height=30, bg="Green")
     player_frame.pack(side=tk.TOP)
 
-    app.player_value_label = label_maker(text=app.state.player.hand_value)
+    app.player_value_label = label_maker(app, text=app.state.player.hand_value)
     app.player_value_label.pack(side=tk.TOP)
+
+    spacer3 = tk.Label(window, bg="Green")
+    spacer3.pack(side=tk.TOP, expand=True, fill="y")
 
     button_frame = tk.Frame(window, width=300, height=10, bg="Green")
     button_frame.pack(side=tk.TOP)
 
-    hit_button = btn_maker(app, button_frame, "Hit")
-    hit_button.grid(row=0, column=0)
-    stand_button = btn_maker(app, button_frame, "Stand")
-    stand_button.grid(row=0, column=1)
-    restart_button = btn_maker(app, button_frame, "Reset")
-    restart_button.grid(row=0, column=2)
+    app.hit_button = btn_maker(app, button_frame, "Hit")
+    app.hit_button.grid(row=0, column=0)
+    app.stand_button = btn_maker(app, button_frame, "Stand")
+    app.stand_button.grid(row=0, column=1)
+    app.reset_button = btn_maker(app, button_frame, "Reset")
+    app.reset_button.grid(row=0, column=2)
 
     for i in range(11):
-        app.player_image_labels[i] = label_maker(player_frame)
-        app.dealer_image_labels[i] = label_maker(dealer_frame)
+        app.player_image_labels[i] = label_maker(app, player_frame)
+        app.dealer_image_labels[i] = label_maker(app, dealer_frame)
+
+    app.window_resized = app.game_state_label.bind("<Configure>", window_resized)
+    window.after(20, resizer, app)
 
     game(app)
 
