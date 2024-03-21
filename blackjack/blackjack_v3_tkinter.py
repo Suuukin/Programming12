@@ -50,12 +50,12 @@ class App:
         self.player_image_labels = {}
         self.dealer_image_labels = {}
 
-        self.card_images = {}
-        self.card_cropped = {}
+        self.card_images = {} # tkinter Image objects
+        self.card_cropped = {} # cropped tkinter image objects
         self.full_deck = []
 
-        self.window_width = 900 # initial window width
-        self.window_height = 750 # initial window height
+        self.window_width = 900  # initial window width
+        self.window_height = 750  # initial window height
 
         self.player_wins = 0
         self.dealer_wins = 0
@@ -170,7 +170,7 @@ def calculate_score(app, player):
 
 def resizer(app, hand):
     """
-    Checks if the game window has been resized, 
+    Checks if the game window has been resized,
     then changes the font sizes and decides if cards should be stacked.
     """
     window_width = app.window.winfo_width()
@@ -367,6 +367,7 @@ def player_stand(app):
     app.state.player.status = "stood"
     dealer_turn(app)
 
+
 def reset_game(app):
     """
     Sets up game by resetting labels, variables, and deck.
@@ -385,7 +386,6 @@ def reset_game(app):
 
     display_hand(app, player=True)
     display_hand(app, player=False)
-
 
 
 def btn_op(app, text):
