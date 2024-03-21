@@ -11,8 +11,8 @@ from PIL import ImageTk, Image
 @dataclasses.dataclass
 class Player:
     """
-    Class created to streamline all the data
-    that needs to be stored relating to the player and dealer.
+    Class that holds all data related to player and dealer.
+    Reset everytime game resets.
     """
 
     hand: list = dataclasses.field(default_factory=list)
@@ -24,8 +24,9 @@ class Player:
 @dataclasses.dataclass
 class State:
     """
-    Main class to hold all variables that could be needed globally.
-    It's reset everytime a new game is started.
+    Class holds all variables that could be needed globally.
+    Includes the dealer and player class.
+    Reset everytime game resets.
     """
 
     deck: list = dataclasses.field(default_factory=list)
@@ -35,6 +36,11 @@ class State:
 
 
 class App:
+    """
+    Main class that holds global tkinter elements and the State class.
+    Also contains variables that should not reset on game restart.
+    """
+
     def __init__(self):
         self.state = State()
 
@@ -48,20 +54,26 @@ class App:
         self.card_cropped = {}
         self.full_deck = []
 
-        self.window_width = 900
-        self.window_height = 750
+        self.window_width = 900 # initial window width
+        self.window_height = 750 # initial window height
 
         self.player_wins = 0
         self.dealer_wins = 0
 
 
 def load_image(app, name):
+    """
+    Takes image path and name and returns tkinter Image object.
+    """
     image_dir = os.path.join(app.image_path, name)
     image = Image.open(image_dir).convert("RGBA")
     return image
 
 
 def label_maker(app, frame=None, text=" ", padx=20, pady=10):
+    """
+    Creates a default label with configurable properties depending on input paramaters.
+    """
     return tk.Label(
         frame,
         text=text,
@@ -74,6 +86,9 @@ def label_maker(app, frame=None, text=" ", padx=20, pady=10):
 
 
 def update_label(label, text=None, color=None, image=None, font=None):
+    """
+    Updates a multitude of paramaters of an input label.
+    """
     label.configure(text=text, bg=color, image=image, font=font)
 
 
@@ -89,7 +104,7 @@ def create_deck(image_dir):
 
 def get_hand(app, player):
     """
-    Takes in the app.state dataclass and the boolean
+    Takes in the State dataclass and the boolean
     of if it's for the player, then returns the
     hand for either dealer or player.
     """
@@ -102,8 +117,8 @@ def get_hand(app, player):
 
 def get_status(app, player):
     """
-    Takes in the app.state dataclass and the boolean of
-    if it's for the player, then returns the statys
+    Takes in the State dataclass and the boolean of
+    if it's for the player, then returns the status
     for either dealer or player.
     """
     if player:
@@ -153,14 +168,18 @@ def calculate_score(app, player):
     return hand_value
 
 
-def shrink_check(app, hand):
+def resizer(app, hand):
+    """
+    Checks if the game window has been resized, 
+    then changes the font sizes and decides if cards should be stacked.
+    """
     window_width = app.window.winfo_width()
     window_height = app.window.winfo_height()
     card_width = 125
     card_spaces = (window_width - 40) / card_width
     card_stack = False
 
-    if card_spaces < len(hand): 
+    if card_spaces < len(hand):
         card_stack = True
 
     if window_width < window_height:
@@ -190,7 +209,7 @@ def display_hand(app, player):
     hand = get_hand(app, player)
     cards = ""
 
-    card_stack = shrink_check(app, hand)
+    card_stack = resizer(app, hand)
 
     for i, card in enumerate(hand):
         cards += f"{card} "
@@ -238,7 +257,10 @@ def update_value(app, player):
         app.state.dealer.hand_value = calculate_score(app, player)
 
 
-def clear_hide_label(label):
+def hide_label(label):
+    """
+    Removes input label from grid and clears its text.
+    """
     update_label(label, image=None)
     label.grid_remove()
 
@@ -252,11 +274,6 @@ def deal_card(app, player):
     card = app.state.deck.pop()
     hand.append(card)
     display_hand(app, player)
-
-
-def clear_hide_label(label):
-    update_label(label, image=None)
-    label.grid_remove()
 
 
 def win_check(app, player):
@@ -344,15 +361,39 @@ def dealer_turn(app):
 
 
 def player_stand(app):
+    """
+    Player stands, then starts dealer's turn.
+    """
     app.state.player.status = "stood"
     dealer_turn(app)
 
+def reset_game(app):
+    """
+    Sets up game by resetting labels, variables, and deck.
+    """
+    for i in range(len(app.player_image_labels)):
+        hide_label(app.player_image_labels[i])
+        hide_label(app.dealer_image_labels[i])
+
+    app.state = State()
+    app.state.deck = deck = list(app.full_deck)
+
+    random.shuffle(deck)
+
+    app.state.player.hand = [deck.pop(), deck.pop()]
+    app.state.dealer.hand = [deck.pop(), "card_back.png"]
+
+    display_hand(app, player=True)
+    display_hand(app, player=False)
+
+
 
 def btn_op(app, text):
-    """Updates the label for normal keyboard,
-    or does specific function for special buttons."""
+    """
+    Assigns functions to buttons based on their text.
+    """
     if text == "Reset":
-        game(app)
+        reset_game(app)
         update_label(
             app.game_state_label,
             f"Player to Dealer wins {app.player_wins}:{app.dealer_wins}",
@@ -367,10 +408,16 @@ def btn_op(app, text):
 
 
 def btn_maker(app, frame, text):
+    """
+    Creates buttons with variable input text and the btn_op() function.
+    """
     return tk.Button(frame, text=text, font=app.font, command=lambda: btn_op(app, text))
 
 
-def resizer(app, initial=False):
+def configured_window(app, initial=False):
+    """
+    .after loop that checks if window size has changed.
+    """
     window_resized = False
 
     if initial:
@@ -388,25 +435,7 @@ def resizer(app, initial=False):
         display_hand(app, player=False)
         display_hand(app, player=True)
 
-    app.window.after(200, resizer, app)
-
-
-def game(app):
-
-    for i in range(len(app.player_image_labels)):
-        clear_hide_label(app.player_image_labels[i])
-        clear_hide_label(app.dealer_image_labels[i])
-
-    app.state = State()
-    app.state.deck = deck = list(app.full_deck)
-
-    random.shuffle(deck)
-
-    app.state.player.hand = [deck.pop(), deck.pop()]
-    app.state.dealer.hand = [deck.pop(), "card_back.png"]
-
-    display_hand(app, player=True)
-    display_hand(app, player=False)
+    app.window.after(200, configured_window, app)
 
 
 def main():
@@ -432,7 +461,9 @@ def main():
     dealer_frame = tk.Frame(width=300, height=30, bg="Green")
     dealer_frame.pack(side=tk.TOP)
 
-    app.dealer_value_label = label_maker(app, text=app.state.dealer.hand_value, padx=10, pady=5)
+    app.dealer_value_label = label_maker(
+        app, text=app.state.dealer.hand_value, padx=10, pady=5
+    )
     app.dealer_value_label.pack(side=tk.TOP)
 
     spacer2 = tk.Frame(bg="Green")
@@ -441,7 +472,9 @@ def main():
     player_frame = tk.Frame(width=300, height=30, bg="Green")
     player_frame.pack(side=tk.TOP)
 
-    app.player_value_label = label_maker(app, text=app.state.player.hand_value, padx=10, pady=5)
+    app.player_value_label = label_maker(
+        app, text=app.state.player.hand_value, padx=10, pady=5
+    )
     app.player_value_label.pack(side=tk.TOP)
 
     spacer3 = tk.Frame(bg="Green")
@@ -466,9 +499,9 @@ def main():
         app.player_image_labels[i] = label_maker(app, player_frame)
         app.dealer_image_labels[i] = label_maker(app, dealer_frame)
 
-    game(app)
+    reset_game(app)
 
-    window.after(20, resizer, app, True)
+    window.after(20, configured_window, app, True)
 
     window.mainloop()
 
