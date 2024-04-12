@@ -55,12 +55,11 @@ def create_button(letter, frame=window):
 
 
 def btn_click(letter):
-    guess_labels[wordle.letter_count]["text"] = letter
-    wordle.guess += letter
-    print(wordle.guess)
-
     if wordle.letter_count < 5:
+        guess_labels[wordle.letter_count]["text"] = letter
+        wordle.guess += letter
         wordle.letter_count += 1
+        print(wordle.guess)
 
 
 def delete_char():
@@ -87,34 +86,32 @@ def color_label(color):
 def letter_check(letter_color, letter, word, letter_position):
     if letter_color == "white":
         if letter not in word:
-            return False
+            return True
     elif letter_color == "yellow":
         if letter in word and word[letter_position] != letter:
-            return False
+            return True
     elif letter_color == "green":
-        if word == "basic":
-            print(
-                f"word = {word}, letter_word = {word[letter_position]} letter = {letter}"
-            )
-        if letter in word and word[letter_position] == letter:
-            return False
-    return True
+        if word[letter_position] == letter:
+            return True
+    return False
 
 
 def find_possible_words():
     text_area.configure(state="normal")
-    possible_words = wordlist.wordle_list
+
+    word_list = set(wordlist.wordle_list)
+    excluded_words = set()
     for i, letter in enumerate(wordle.guess):
         letter_color = guess_labels[i]["bg"]
-        for word in possible_words:
-            remove_word = letter_check(letter_color, letter, word, i)
-            if remove_word:
-                possible_words.remove(word)
-                print(f"removing {word}, because {letter_color, letter, i, word[i]}")
-            else:
-                print(f"keeping {word}, because {letter_color, letter, i, word[i]}")
+
+        for word in word_list - excluded_words:
+            keep_word = letter_check(letter_color, letter, word, i)
+
+            if not keep_word:
+                excluded_words.add(word)
+
     text_area.delete("1.0", tk.END)
-    text_area.insert(tk.END, possible_words)
+    text_area.insert(tk.END, sorted(word_list - excluded_words))
     text_area.configure(state="disabled")
 
 
@@ -148,7 +145,7 @@ for row, key_row in enumerate(KEY_ROWS):
     keys = list(key_row)
     for column, key_text in enumerate(keys):
         keyboard_frames[key_text] = button = create_button(key_text, frame=frame)
-        button.bind(str(key_text), lambda: btn_click(key_text))
+        window.bind(str(key_text), lambda event, k=key_text: btn_click(k))
         button.grid(row=1, column=column + 1)
 
 del_button = tk.Button(
@@ -160,6 +157,7 @@ del_button = tk.Button(
     command=delete_char,
 )
 del_button.grid(row=1, column=12)
+window.bind("<BackSpace>", lambda event: delete_char())
 
 enter_button = tk.Button(
     keyboard_frames[2],
@@ -170,6 +168,7 @@ enter_button = tk.Button(
     command=find_possible_words,
 )
 enter_button.grid(row=1, column=10)
+window.bind("<Return>", lambda event: find_possible_words())
 
 yellow_button = tk.Button(
     guess_frame,
@@ -192,7 +191,7 @@ green_button = tk.Button(
 green_button.grid(row=0, column=7)
 
 text_area = scrolledtext.ScrolledText(
-    potential_words_frame, wrap=tk.WORD, width=50, height=30
+    potential_words_frame, wrap=tk.WORD, width=50, height=30, state="disabled"
 )
 text_area.grid(row=0, column=0, sticky="nsew")
 
