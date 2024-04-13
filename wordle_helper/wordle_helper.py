@@ -59,14 +59,12 @@ def btn_click(letter):
         guess_labels[wordle.letter_count]["text"] = letter
         wordle.guess += letter
         wordle.letter_count += 1
-        print(wordle.guess)
 
 
 def delete_char():
     # This function will delete the current letter
     # Use a class variable (wordle.letter_count) to keep track of which label to erase
     # go back a spot as long as you are not in the first spot
-    print("delete")
     if wordle.letter_count != 0:
         wordle.letter_count -= 1
         wordle.guess = wordle.guess[:-1]
@@ -83,9 +81,9 @@ def color_label(color):
     guess_labels[label_position]["bg"] = color
 
 
-def letter_check(letter_color, letter, word, letter_position):
+def letter_check(letter_color, letter, word, letter_position, green_letters):
     if letter_color == "white":
-        if letter not in word:
+        if letter not in word or letter in green_letters:
             return True
     elif letter_color == "yellow":
         if letter in word and word[letter_position] != letter:
@@ -96,6 +94,9 @@ def letter_check(letter_color, letter, word, letter_position):
     return False
 
 
+green_letters = []
+
+
 def find_possible_words():
     text_area.configure(state="normal")
 
@@ -103,9 +104,12 @@ def find_possible_words():
     excluded_words = set()
     for i, letter in enumerate(wordle.guess):
         letter_color = guess_labels[i]["bg"]
-
-        for word in word_list - excluded_words:
-            keep_word = letter_check(letter_color, letter, word, i)
+        if letter_color == "green":
+            if letter not in green_letters:
+                green_letters.append(letter)
+                print(green_letters)
+        for word in (word_list - excluded_words):
+            keep_word = letter_check(letter_color, letter, word, i, green_letters)
 
             if not keep_word:
                 excluded_words.add(word)
