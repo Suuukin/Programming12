@@ -17,13 +17,27 @@ small_font = font.Font(family="Courier", size=20, weight="bold")
 super_small_font = font.Font(family="Courier", size=20, weight="bold")
 
 
+class Row:
+    def __init__(self, row_number):
+        self.row = row_number
+        self.guess = ""
+        self.result = None
+        self.letter_count = 0
+
+    def delete_char(self):
+        if self.letter_count != 0:
+            self.letter_count -= 1
+            self.guess = self.guess[:-1]
+            guess_buttons[(self.letter_count, self.row)]["text"] = " "
+            guess_buttons[(self.letter_count, self.row)]["bg"] = "grey"
+
+
 class State:
     def __init__(self):
-        self.letter_count = 0
-        self.guess = ""
-        self.green_letters = {}
-        self.yellow_letters = {}
-        self.excluded_words = set()
+        self.current_row = 1
+        self.guess_rows = {}
+        for row in range(1, 6):
+            self.guess_rows[row] = Row(row)
 
 
 class App:
@@ -63,30 +77,13 @@ def create_button(letter, frame=window):
 
 
 def btn_click(letter):
-    if app.state.letter_count < 5:
+    if app.state.letter_count_row["current_row"] < 5:
         guess_buttons[app.state.letter_count]["text"] = letter
-        app.state.guess += letter
+        app.state.guess_rows[app.state.current_row] += letter
         app.state.letter_count += 1
 
 
-def delete_char():
-    # This function will delete the current letter
-    # Use a class variable (app.state.letter_count) to keep track of which label to erase
-    # go back a spot as long as you are not in the first spot
-    if app.state.letter_count != 0:
-        app.state.letter_count -= 1
-        app.state.guess = app.state.guess[:-1]
-        guess_buttons[app.state.letter_count]["text"] = " "
-        guess_buttons[app.state.letter_count]["bg"] = "grey"
-
-
 def color_label(button_position):
-    # if app.state.letter_count == 0:
-    # label_position = app.state.letter_count
-    # else:
-    # label_position = app.state.letter_count - 1
-
-    # guess_buttons[label_position]["bg"] = color
     button = guess_buttons[button_position]
     background_color = button["bg"]
     if background_color == "grey":
@@ -122,7 +119,6 @@ def count_letters(possible_words, green_letters):
 
 
 def evaluate_guesses(letter_counter):
-    score_dict = {}
 
     def word_score(word):
         word_score = 0
@@ -139,26 +135,25 @@ def evaluate_guesses(letter_counter):
 def find_possible_words():
     text_area.configure(state="normal")
     green_letters = []
+    excluded_words = set()
     for i, letter in enumerate(app.state.guess):
         letter_color = guess_buttons[i]["bg"]
         if letter_color == "green":
             if letter not in green_letters:
                 green_letters.append(letter)
 
-        for word in app.word_list - app.state.excluded_words:
+        for word in app.word_list - excluded_words:
             keep_word = letter_check(letter_color, letter, word, i, green_letters)
 
             if not keep_word:
-                app.state.excluded_words.add(word)
+                excluded_words.add(word)
 
-    letter_counter = count_letters(
-        (app.word_list - app.state.excluded_words), green_letters
-    )
+    letter_counter = count_letters((app.word_list - excluded_words), green_letters)
 
     sorted_scores = evaluate_guesses(letter_counter)
     print(sorted_scores)
     text_area.delete("1.0", tk.END)
-    text_area.insert(tk.END, sorted(app.word_list - app.state.excluded_words))
+    text_area.insert(tk.END, sorted(app.word_list - excluded_words))
     text_area.configure(state="disabled")
 
 
@@ -181,18 +176,18 @@ potential_words_frame = tk.Frame(window)
 potential_words_frame.pack(side=tk.TOP)
 
 guess_buttons = {}
-#for y in range(0, 6):
-for x in range(0, 5):
-    guess_buttons[x] = button = tk.Button(
-        guess_frame,
-        text=" ",
-        bg="grey",
-        fg="black",
-        font=super_small_font,
-        command=lambda pos=x: color_label(pos),
-    )
-    # place the label at an x,y position
-    button.grid(row=0, column=x)
+for y in range(0, 6):
+    for x in range(0, 5):
+        guess_buttons[(x, y)] = button = tk.Button(
+            guess_frame,
+            text=" ",
+            bg="grey",
+            fg="black",
+            font=super_small_font,
+            command=lambda pos=(x, y): color_label(pos),
+        )
+        # place the label at an x,y position
+        button.grid(row=y, column=x)
 
 # Create a keyboard
 # start with an empty dictionary called button = {}, then add elements button[1] etc
@@ -215,10 +210,10 @@ del_button = tk.Button(
     bg="grey",
     fg="black",
     font=super_small_font,
-    command=delete_char,
+    command=app.state.guess_rows[app.state.current_row].delete_char(),
 )
 del_button.grid(row=1, column=12)
-window.bind("<BackSpace>", lambda event: delete_char())
+window.bind("<BackSpace>", lambda event: app.state.guess_rows[app.state.current_row].delete_char())
 
 enter_button = tk.Button(
     keyboard_frames[2],
