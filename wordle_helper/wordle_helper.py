@@ -101,7 +101,7 @@ def create_button(letter, frame=window):
 
 def color_label(button_position):
     button = guess_buttons[button_position]
-    background_color = button["bg"]
+    background_color = app.state.char_dict[button_position].color
     if background_color == "grey":
         button["bg"] = "yellow"
         app.state.char_dict[button_position].color = "yellow"
@@ -140,18 +140,16 @@ def evaluate_guesses(letter_count, word_list):
 
     def word_score(word):
         word_score = 0
-        letters = set(word)
-        for c in letters:
+
+        for c in set(word):
+            letter_score = letter_count[c]
+
             for pos, slot in app.state.char_dict.items():
                 x, y = pos
                 if slot.character == word[x] and slot.color == "yellow":
-                    # print(f"yellow letter same slot, {word, slot.character, slot.color}")
-                    if word == "trade":
-                        print(f"yellow, {word_score, c}")
-                    break
-            word_score += letter_count[c]
-            if word == "trade":
-                print(word_score)
+                    letter_score = 0
+
+            word_score += letter_score
 
         return word_score
 
@@ -189,8 +187,8 @@ def find_possible_words():
     text_area.insert(tk.END, guess_string)
     text_area.insert(tk.END, sorted(app.word_list - excluded_words))
     text_area.configure(state="disabled")
-
-    app.state.current_row += 1
+    if app.state.current_row < 5:
+        app.state.current_row += 1
 
 
 def full_reset():
