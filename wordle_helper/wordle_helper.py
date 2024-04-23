@@ -34,7 +34,7 @@ class Row:
 
     def delete_char(self, char_dict):
         if self.letter_count != 0:
-            x = self.letter_count
+            x = self.letter_count - 1
             y = self.row
             self.letter_count -= 1
             self.guess = self.guess[:-1]
@@ -57,6 +57,11 @@ class State:
         self.current_row = 0
         self.guess_rows = {}
         self.char_dict = {}
+
+        for x in range(5):
+            for y in range(6):
+                self.char_dict[(x, y)] = Char(x, y)
+
         for row in range(6):
             self.guess_rows[row] = Row(row)
 
@@ -131,22 +136,27 @@ def count_letters(possible_words, green_letters):
     return letter_counter
 
 
-def evaluate_guesses(letter_count):
+def evaluate_guesses(letter_count, word_list):
 
     def word_score(word):
         word_score = 0
         letters = set(word)
-        for i, c in enumerate(letters):
+        for c in letters:
             for pos, slot in app.state.char_dict.items():
-                if slot.character == c:
-                    if slot.column == i and slot.color == "yellow":
-                        continue
+                x, y = pos
+                if slot.character == word[x] and slot.color == "yellow":
+                    # print(f"yellow letter same slot, {word, slot.character, slot.color}")
+                    if word == "trade":
+                        print(f"yellow, {word_score, c}")
+                    break
             word_score += letter_count[c]
+            if word == "trade":
+                print(word_score)
+
         return word_score
 
-    sorted_words = sorted(app.word_list, reverse=True, key=word_score)
-
-    return sorted_words[:10]
+    sorted_words = sorted(word_list, reverse=True, key=word_score)
+    return sorted_words[:5]
 
 
 def find_possible_words():
@@ -169,11 +179,14 @@ def find_possible_words():
                     excluded_words.add(word)
 
     letter_counter = count_letters((app.word_list - excluded_words), green_letters)
-    sorted_scores = evaluate_guesses(letter_counter)
-    print(sorted_scores)
-    print(green_letters)
+    suggested_guesses = evaluate_guesses(letter_counter, app.word_list)
+    possible_guesses = evaluate_guesses(
+        letter_counter, (app.word_list - excluded_words)
+    )
+    guess_string = f"Suggested Guesses: {suggested_guesses} \n\nGuesses from Possible Words: {possible_guesses} \n\n"
 
     text_area.delete("1.0", tk.END)
+    text_area.insert(tk.END, guess_string)
     text_area.insert(tk.END, sorted(app.word_list - excluded_words))
     text_area.configure(state="disabled")
 
@@ -212,7 +225,6 @@ for y in range(6):
             font=super_small_font,
             command=lambda pos=(x, y): color_label(pos),
         )
-        app.state.char_dict[(x, y)] = Char(x, y)
         # place the label at an x,y position
         button.grid(row=y, column=x)
 
