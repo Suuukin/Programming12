@@ -17,6 +17,14 @@ small_font = font.Font(family="Courier", size=20, weight="bold")
 super_small_font = font.Font(family="Courier", size=20, weight="bold")
 
 
+class Char:
+    def __init__(self, row, column):
+        self.row = row
+        self.column = column
+        self.character = " "
+        self.color = "grey"
+
+
 class Row:
     def __init__(self, row_number):
         self.row = row_number
@@ -24,20 +32,39 @@ class Row:
         self.result = None
         self.letter_count = 0
 
-    def delete_char(self):
+    def delete_char(self, char_dict):
         if self.letter_count != 0:
+            x = self.letter_count
+            y = self.row
             self.letter_count -= 1
             self.guess = self.guess[:-1]
-            guess_buttons[(self.letter_count, self.row)]["text"] = " "
-            guess_buttons[(self.letter_count, self.row)]["bg"] = "grey"
+            char_dict[(x, y)].character = " "
+            char_dict[(x, y)].color = "grey"
+            guess_buttons[(x, y)]["text"] = " "
+            guess_buttons[(x, y)]["bg"] = "grey"
+
+    def add_char(self, letter, char_dict):
+        if self.letter_count < 5:
+            (x, y) = (self.letter_count, self.row)
+            char_dict[(x, y)].character = letter
+            guess_buttons[(x, y)]["text"] = letter
+            self.guess += letter
+            self.letter_count += 1
 
 
 class State:
     def __init__(self):
-        self.current_row = 1
+        self.current_row = 0
         self.guess_rows = {}
-        for row in range(1, 6):
+        self.char_dict = {}
+        for row in range(6):
             self.guess_rows[row] = Row(row)
+
+    def do_delete_char(self):
+        self.guess_rows[self.current_row].delete_char(self.char_dict)
+
+    def btn_click(self, letter):
+        self.guess_rows[self.current_row].add_char(letter, self.char_dict)
 
 
 class App:
@@ -45,22 +72,14 @@ class App:
         self.word_list = set(wordlist.wordle_list)
         self.state = State()
 
+    def btn_click(self, letter):
+        self.state.btn_click(letter)
+
+    def do_delete_char(self):
+        self.state.do_delete_char()
+
 
 app = App()
-
-
-def create_label(frame=window):
-    # Create a Tkinter Label
-    new_label = tk.Label(
-        frame,
-        text=" ",
-        bg="grey",
-        fg="black",
-        font=large_font,
-        borderwidth=2,
-        relief="solid",
-    )
-    return new_label
 
 
 def create_button(letter, frame=window):
@@ -71,16 +90,8 @@ def create_button(letter, frame=window):
         bg="grey",
         fg="black",
         font=small_font,
-        command=lambda: btn_click(letter),
     )
     return new_button
-
-
-def btn_click(letter):
-    if app.state.letter_count_row["current_row"] < 5:
-        guess_buttons[app.state.letter_count]["text"] = letter
-        app.state.guess_rows[app.state.current_row] += letter
-        app.state.letter_count += 1
 
 
 def color_label(button_position):
@@ -88,10 +99,13 @@ def color_label(button_position):
     background_color = button["bg"]
     if background_color == "grey":
         button["bg"] = "yellow"
+        app.state.char_dict[button_position].color = "yellow"
     elif background_color == "yellow":
         button["bg"] = "green"
+        app.state.char_dict[button_position].color = "green"
     elif background_color == "green":
         button["bg"] = "grey"
+        app.state.char_dict[button_position].color = "grey"
 
 
 def letter_check(letter_color, letter, word, letter_position, green_letters):
@@ -114,17 +128,20 @@ def count_letters(possible_words, green_letters):
             letter_counter[c] += 1
     for letter in green_letters:
         del letter_counter[letter]
-    print(letter_counter)
     return letter_counter
 
 
-def evaluate_guesses(letter_counter):
+def evaluate_guesses(letter_count):
 
     def word_score(word):
         word_score = 0
         letters = set(word)
-        for c in letters:
-            word_score += letter_counter[c]
+        for i, c in enumerate(letters):
+            for pos, slot in app.state.char_dict.items():
+                if slot.character == c:
+                    if slot.column == i and slot.color == "yellow":
+                        continue
+            word_score += letter_count[c]
         return word_score
 
     sorted_words = sorted(app.word_list, reverse=True, key=word_score)
@@ -136,25 +153,31 @@ def find_possible_words():
     text_area.configure(state="normal")
     green_letters = []
     excluded_words = set()
-    for i, letter in enumerate(app.state.guess):
-        letter_color = guess_buttons[i]["bg"]
-        if letter_color == "green":
-            if letter not in green_letters:
-                green_letters.append(letter)
+    for row, guess_row in app.state.guess_rows.items():
+        for column, letter in enumerate(guess_row.guess):
+            letter_color = app.state.char_dict[(column, row)].color
+            if letter_color == "green":
+                if letter not in green_letters:
+                    green_letters.append(letter)
 
-        for word in app.word_list - excluded_words:
-            keep_word = letter_check(letter_color, letter, word, i, green_letters)
+            for word in app.word_list - excluded_words:
+                keep_word = letter_check(
+                    letter_color, letter, word, column, green_letters
+                )
 
-            if not keep_word:
-                excluded_words.add(word)
+                if not keep_word:
+                    excluded_words.add(word)
 
     letter_counter = count_letters((app.word_list - excluded_words), green_letters)
-
     sorted_scores = evaluate_guesses(letter_counter)
     print(sorted_scores)
+    print(green_letters)
+
     text_area.delete("1.0", tk.END)
     text_area.insert(tk.END, sorted(app.word_list - excluded_words))
     text_area.configure(state="disabled")
+
+    app.state.current_row += 1
 
 
 def full_reset():
@@ -166,18 +189,21 @@ def full_reset():
     text_area.configure(state="disabled")
 
 
-guess_frame = tk.Frame(window)
+main_frame = tk.Frame(window)
+main_frame.grid(row=0, column=0)
+
+guess_frame = tk.Frame(main_frame)
 guess_frame.pack(side=tk.TOP)
 
-keyboard_frame = tk.Frame(window)
+keyboard_frame = tk.Frame(main_frame)
 keyboard_frame.pack(side=tk.TOP)
 
-potential_words_frame = tk.Frame(window)
+potential_words_frame = tk.Frame(main_frame)
 potential_words_frame.pack(side=tk.TOP)
 
 guess_buttons = {}
-for y in range(0, 6):
-    for x in range(0, 5):
+for y in range(6):
+    for x in range(5):
         guess_buttons[(x, y)] = button = tk.Button(
             guess_frame,
             text=" ",
@@ -186,6 +212,7 @@ for y in range(0, 6):
             font=super_small_font,
             command=lambda pos=(x, y): color_label(pos),
         )
+        app.state.char_dict[(x, y)] = Char(x, y)
         # place the label at an x,y position
         button.grid(row=y, column=x)
 
@@ -201,7 +228,7 @@ for row, key_row in enumerate(KEY_ROWS):
     keys = list(key_row)
     for column, key_text in enumerate(keys):
         keyboard_frames[key_text] = button = create_button(key_text, frame=frame)
-        window.bind(str(key_text), lambda event, k=key_text: btn_click(k))
+        window.bind(str(key_text), lambda event, k=key_text: app.btn_click(k))
         button.grid(row=1, column=column + 1)
 
 del_button = tk.Button(
@@ -210,10 +237,13 @@ del_button = tk.Button(
     bg="grey",
     fg="black",
     font=super_small_font,
-    command=app.state.guess_rows[app.state.current_row].delete_char(),
+    command=app.do_delete_char,
 )
 del_button.grid(row=1, column=12)
-window.bind("<BackSpace>", lambda event: app.state.guess_rows[app.state.current_row].delete_char())
+window.bind(
+    "<BackSpace>",
+    lambda event: app.do_delete_char(),
+)
 
 enter_button = tk.Button(
     keyboard_frames[2],
@@ -227,7 +257,7 @@ enter_button.grid(row=1, column=10)
 window.bind("<Return>", lambda event: find_possible_words())
 
 text_area = scrolledtext.ScrolledText(
-    potential_words_frame, wrap=tk.WORD, width=50, height=30, state="disabled"
+    potential_words_frame, wrap=tk.WORD, width=50, height=20, state="disabled"
 )
 text_area.grid(row=0, column=0, sticky="nsew")
 
