@@ -94,13 +94,13 @@ app = App()
 
 
 def create_button(letter, frame=window):
-    # Create a Tkinter Label
     new_button = tk.Button(
         frame,
         text=letter,
         bg="grey",
         fg="black",
         font=small_font,
+        command=lambda: app.btn_click(letter)
     )
     return new_button
 
